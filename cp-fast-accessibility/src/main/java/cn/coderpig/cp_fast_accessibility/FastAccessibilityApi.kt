@@ -64,7 +64,39 @@ fun sleep(millis: Long) = Thread.sleep(millis)
 /**
  * 结点操作快速调用
  * */
+
+fun fastGestureDescription(operate: (Path) -> Unit, startTime: Long = 0L, duration: Long = 50L): GestureDescription =
+    GestureDescription.Builder().apply {
+        addStroke(GestureDescription.StrokeDescription(Path().apply {
+            operate.invoke(this)
+        }, 0L, duration))
+    }.build()
+
+fun fastGestureCallback() = object : AccessibilityService.GestureResultCallback() {
+    override fun onCompleted(gestureDescription: GestureDescription?) {
+        super.onCompleted(gestureDescription)
+        // 手势执行完成回调
+    }
+}
+
+fun click(
+    x: Int,
+    y: Int,
+    delayTime: Long = 50,
+    duration: Long = 10,
+    repeatCount: Int = 1,
+    randomPosition: Int = 5,
+    randomTime: Long = 0
+) {
+    FastAccessibilityService.require.dispatchGesture(fastGestureDescription(
+        { it.moveTo(x.toFloat(), y.toFloat()) }
+    ), fastGestureCallback(), null)
+}
+
+
 // 结点点击，现在很多APP屏蔽了结点点击，默认采用手势模拟
+
+
 fun NodeWrapper?.click(gestureClick: Boolean = true, duration: Long = 200L) {
     if (this == null) return
     if (gestureClick) {
