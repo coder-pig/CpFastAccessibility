@@ -1,14 +1,14 @@
 package cn.coderpig.cpfastaccessibility
 
+import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.view.View
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
-import cn.coderpig.cp_fast_accessibility.FastAccessibilityService
-import cn.coderpig.cp_fast_accessibility.isAccessibilityEnable
-import cn.coderpig.cp_fast_accessibility.requireAccessibility
+import androidx.annotation.RequiresApi
+import cn.coderpig.cp_fast_accessibility.*
 
 class MainActivity : AppCompatActivity() {
     private lateinit var mServiceStatusIv: ImageView
@@ -38,12 +38,17 @@ class MainActivity : AppCompatActivity() {
         mOpenTargetAppBt.setOnClickListener(mClickListener)
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onResume() {
         super.onResume()
         if (isAccessibilityEnable) {
             mServiceStatusIv.setImageDrawable(getDrawableRes(R.drawable.ic_service_enable))
             mServiceStatusTv.text = getStringRes(R.string.service_status_enable)
             mOpenTargetAppBt.visibility = View.VISIBLE
+            FastAccessibilityService.showForegroundNotification(
+                "守护最好的坤坤🐤", "用来保护的，不用理我", "提示信息",
+                activityClass = MainActivity::class.java
+            )
         } else {
             mServiceStatusIv.setImageDrawable(getDrawableRes(R.drawable.ic_service_disable))
             mServiceStatusTv.text = getStringRes(R.string.service_status_disable)

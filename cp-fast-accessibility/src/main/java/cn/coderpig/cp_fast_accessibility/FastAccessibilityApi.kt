@@ -33,6 +33,22 @@ var isListenApp: Boolean
         FastAccessibilityService.enableListenApp = value
     }
 
+/**
+ * 显示前台服务
+ * */
+@RequiresApi(Build.VERSION_CODES.O)
+fun showForegroundNotification(
+    title: String = "通知标题",
+    content: String = "通知内容",
+    ticker: String = "通知提示语",
+    iconRes: Int? = null,
+    activityClass: Class<*>? = null
+) = FastAccessibilityService.showForegroundNotification(title, content, ticker, iconRes, activityClass)
+
+/**
+ * 隐藏前台服务
+ * */
+fun closeForegroundNotification() = FastAccessibilityService.closeForegroundNotification()
 
 /**
  * 请求无障碍服务

@@ -2,12 +2,21 @@ package cn.coderpig.cp_fast_accessibility
 
 import android.accessibilityservice.AccessibilityService
 import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
+import android.graphics.Color
 import android.graphics.Rect
+import android.os.Build
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import androidx.annotation.RequiresApi
+import androidx.core.app.NotificationCompat
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import kotlin.random.Random
 
 
 /**
@@ -17,6 +26,7 @@ import java.util.concurrent.Executors
  */
 abstract class FastAccessibilityService : AccessibilityService() {
     companion object {
+        private const val TAG = "FastAccessibilityService"
         var instance: FastAccessibilityService? = null  // 无障碍服务对象实例，暴露给外部调用
         val isServiceEnable: Boolean get() = instance != null   // 无障碍服务是否可用
         private var _appContext: Context? = null    // 幕后属性，对外表现为只读，对内表现为可读写
@@ -25,6 +35,10 @@ abstract class FastAccessibilityService : AccessibilityService() {
         private var listenEventTypeList = arrayListOf(AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) // 监听的event类型列表
         val currentEvent get() = instance?.currentEventWrapper  // 获取当前Event
         var enableListenApp: Boolean = true    // 是否监听APP的标记，默认监听
+
+        var foregroundNotification: Notification? = null    // 前台服务，用于保活
+        var channelId = Random.nextInt(1, 1001)    // 渠道id
+        var channelName = "FastAccessibilityService"    // 渠道名称
 
         /**
          * 库初始化方法，必须在Application的OnCreate()中调用
@@ -54,6 +68,62 @@ abstract class FastAccessibilityService : AccessibilityService() {
          * 无障碍服务Action套一层，没权限直接跳设置
          * */
         val require get() = run { requireAccessibility(); instance!! }
+
+        /**
+         * 显示前台服务
+         *
+         * @param title 通知标题
+         * @param content 通知内容
+         * @param content 通知提示语
+         * @param iconRes 通知小图标
+         * */
+        @RequiresApi(Build.VERSION_CODES.O)
+        fun showForegroundNotification(
+            title: String = "通知标题",
+            content: String = "通知内容",
+            ticker: String = "通知提示语",
+            iconRes: Int? = null,
+            activityClass: Class<*>? = null
+        ) {
+            // 有前台服务权限直接创建并开始
+            val notificationManager = instance?.getSystemService(NOTIFICATION_SERVICE) as? NotificationManager
+            // 创建通知渠道，一定要写在创建显示通知之前，创建通知渠道的代码只有在第一次执行才会创建
+            // 以后每次执行创建代码检测到该渠道已存在，因此不会重复创建
+            notificationManager?.createNotificationChannel(
+                NotificationChannel("$channelId", channelName, NotificationManager.IMPORTANCE_HIGH).apply {
+                    // 下述都是非必要的，看自己需求配置
+                    enableLights(true)  // 如果设备有指示灯，开启指示灯
+                    lightColor = Color.GREEN    // 设置指示灯颜色
+                    enableVibration(true)   // 开启震动
+                    vibrationPattern = longArrayOf(100, 200, 300, 400)  // 设置震动频率
+                    setShowBadge(true)  // 是否显示角标
+                    setBypassDnd(true)  // 是否绕过免打扰模式
+                    lockscreenVisibility = Notification.VISIBILITY_PRIVATE  // 是否在锁屏屏幕上显示此频道的通知
+                }
+            )
+            foregroundNotification = NotificationCompat.Builder(appContext, "$channelId").apply {
+                setSmallIcon(iconRes ?: R.drawable.ic_default_foreground_notification) // 设置小图标
+                setContentTitle(title)
+                setContentText(content)
+                setTicker(ticker)
+                activityClass?.let {
+                    setContentIntent(
+                        PendingIntent.getActivity(
+                            instance!!, 0, Intent(instance, it),
+                            PendingIntent.FLAG_IMMUTABLE
+                        )
+                    )
+                }
+            }.build()
+            instance?.startForeground(channelId, foregroundNotification!!)
+        }
+
+        /**
+         * 关闭前台服务
+         * */
+        fun closeForegroundNotification() {
+            foregroundNotification?.let { instance?.stopForeground(true) }
+        }
     }
 
     var currentEventWrapper: EventWrapper? = null   // 当前Event
@@ -68,6 +138,7 @@ abstract class FastAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         if (this::class.java == specificServiceClass) instance = null
+        closeForegroundNotification()
         executor.shutdown()
         super.onDestroy()
     }
@@ -137,5 +208,6 @@ abstract class FastAccessibilityService : AccessibilityService() {
         e.printStackTrace()
         null
     }
+
 
 }
