@@ -1,15 +1,18 @@
 package cn.coderpig.cp_fast_accessibility
 
 import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Rect
 import android.os.Build
+import android.security.KeyChainAliasCallback
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import androidx.annotation.RequiresApi
@@ -130,7 +133,6 @@ abstract class FastAccessibilityService : AccessibilityService() {
         private set
     var executor: ExecutorService = Executors.newFixedThreadPool(4) // 执行任务的线程池
 
-    var foregroundNotification: Notification? = null    // 前台服务
 
     override fun onServiceConnected() {
         if (this::class.java == specificServiceClass) instance = this
@@ -150,7 +152,7 @@ abstract class FastAccessibilityService : AccessibilityService() {
             val packageName = event.packageName.blankOrThis()
             val eventType = event.eventType
             if (className.isNotBlank() && packageName.isNotBlank())
-                analyzeSource(EventWrapper(packageName, className, eventType), ::analyzeCallBack)
+                analyzeSource(EventWrapper(packageName, className, eventType), callback = ::analyzeCallBack)
         }
     }
 
@@ -158,11 +160,16 @@ abstract class FastAccessibilityService : AccessibilityService() {
      * 解析当前页面结点
      *
      * @param wrapper Event包装类
-     * @param
+     * @param waitTime 延迟获取结点Source的时间
+     * @param callback 处理结点信息的回调
      * */
-    fun analyzeSource(wrapper: EventWrapper? = null, callback: ((EventWrapper?, AnalyzeSourceResult) -> Unit)? = null) {
+    fun analyzeSource(
+        wrapper: EventWrapper? = null,
+        waitTime: Long = 100,
+        callback: ((EventWrapper?, AnalyzeSourceResult) -> Unit)? = null
+    ) {
         executor.execute {
-            Thread.sleep(100)   // 休眠200毫秒避免获取到错误的source
+            Thread.sleep(waitTime)   // 休眠200毫秒避免获取到错误的source
             currentEventWrapper = wrapper
             // 遍历解析获得结点列表
             val analyzeSourceResult = AnalyzeSourceResult(arrayListOf())

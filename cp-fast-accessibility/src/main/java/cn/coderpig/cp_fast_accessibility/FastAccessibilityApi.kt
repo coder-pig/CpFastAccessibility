@@ -97,7 +97,7 @@ fun fastGestureDescription(operate: (Path) -> Unit, startTime: Long = 0L, durati
     GestureDescription.Builder().apply {
         addStroke(GestureDescription.StrokeDescription(Path().apply {
             operate.invoke(this)
-        }, 0L, duration))
+        }, startTime, duration))
     }.build()
 
 // 快速生成GestureResultCallback的方法
@@ -136,7 +136,10 @@ fun click(
         val tempDuration = duration + Random.nextLong(0 - randomTime, randomTime + 1)
         FastAccessibilityService.require.dispatchGesture(
             fastGestureDescription({
-                it.moveTo(tempX.toFloat(), tempY.toFloat())
+                it.moveTo(
+                    if (tempX < 0) x.toFloat() else tempX.toFloat(),
+                    if (tempY < 0) y.toFloat() else tempY.toFloat()
+                )
             }, delayTime, tempDuration), fastGestureCallback(), null
         )
     }
@@ -173,8 +176,14 @@ fun swipe(
         val tempEndY = endY + Random.nextInt(0 - randomPosition, randomPosition + 1)
         val tempDuration = duration + Random.nextLong(0 - randomTime, randomTime + 1)
         FastAccessibilityService.require.dispatchGesture(fastGestureDescription({
-            it.moveTo(tempStartX.toFloat(), tempStartY.toFloat())
-            it.lineTo(tempEndX.toFloat(), tempEndY.toFloat())
+            it.moveTo(
+                if (tempStartX < 0) startX.toFloat() else tempStartX.toFloat(),
+                if (tempStartY < 0) startY.toFloat() else tempStartY.toFloat()
+            )
+            it.lineTo(
+                if (tempEndX < 0) endX.toFloat() else tempEndX.toFloat(),
+                if (tempEndY < 0) endY.toFloat() else tempEndY.toFloat()
+            )
         }, tempDuration), fastGestureCallback(), null)
     }
 }
@@ -218,7 +227,11 @@ fun AccessibilityNodeInfo?.fastFindAction(
 fun NodeWrapper?.click(gestureClick: Boolean = true, duration: Long = 200L) {
     if (this == null) return
     if (gestureClick) {
-        bounds?.let { click((it.left + it.right) / 2, (it.top + it.bottom) / 2, 0, duration) }
+        bounds?.let {
+            val centerX = (it.left + it.right) / 2
+            val centerY = (it.left + it.right) / 2
+            if (centerX >= 0 && centerY >= 0) click(centerX, centerY, 0, duration)
+        }
     } else {
         nodeInfo.fastFindAction({ it.isClickable }, {
             it.performAction(if (duration >= 1000L) AccessibilityNodeInfo.ACTION_LONG_CLICK else AccessibilityNodeInfo.ACTION_CLICK)
