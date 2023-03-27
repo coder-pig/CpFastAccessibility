@@ -13,8 +13,6 @@ class MyAccessibilityService : FastAccessibilityService() {
         private const val TAG = "CpFastAccessibility"
     }
 
-    override val enableListenApp = true
-
     override fun analyzeCallBack(wrapper: EventWrapper?, result: AnalyzeSourceResult) {
         result.findNodeByText("搜索").click()
         result.findAllTextNode(true).nodes.forEach { Log.e(TAG, "$wrapper | $it ") }

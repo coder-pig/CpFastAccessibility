@@ -11,20 +11,31 @@ import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
 import androidx.annotation.RequiresApi
 import org.w3c.dom.Node
+import kotlin.random.Random
 
 /**
  * Author: CoderPig
  * Date: 2023-03-24
- * Desc:
+ * Desc: 快速调用API
  */
+
 /**
  * 无障碍服务是否可用
  * */
 val isAccessibilityEnable get() = FastAccessibilityService.isServiceEnable
 
 /**
+ * 是否监听App
+ * */
+var isListenApp: Boolean
+    get() = FastAccessibilityService.enableListenApp
+    set(value) {
+        FastAccessibilityService.enableListenApp = value
+    }
+
+
+/**
  * 请求无障碍服务
- * @param autoJump 是否自动跳转无障碍设置页
  * */
 fun requireAccessibility() = FastAccessibilityService.requireAccessibility()
 
@@ -62,9 +73,10 @@ fun splitScreen() = performAction(AccessibilityService.GLOBAL_ACTION_TOGGLE_SPLI
 fun sleep(millis: Long) = Thread.sleep(millis)
 
 /**
- * 结点操作快速调用
+ * 手势模拟相关
  * */
 
+// 快速生成GestureDescription的方法
 fun fastGestureDescription(operate: (Path) -> Unit, startTime: Long = 0L, duration: Long = 50L): GestureDescription =
     GestureDescription.Builder().apply {
         addStroke(GestureDescription.StrokeDescription(Path().apply {
@@ -72,6 +84,7 @@ fun fastGestureDescription(operate: (Path) -> Unit, startTime: Long = 0L, durati
         }, 0L, duration))
     }.build()
 
+// 快速生成GestureResultCallback的方法
 fun fastGestureCallback() = object : AccessibilityService.GestureResultCallback() {
     override fun onCompleted(gestureDescription: GestureDescription?) {
         super.onCompleted(gestureDescription)
@@ -79,145 +92,163 @@ fun fastGestureCallback() = object : AccessibilityService.GestureResultCallback(
     }
 }
 
+/**
+ * 使用手势模拟点击，长按的话，传入的Duration大一些就好，比如1000(1s)
+ *
+ * @param x 点击坐标点的x坐标
+ * @param y 点击坐标点的y坐标
+ * @param delayTime 延迟多久进行本次点击，单位毫秒
+ * @param duration 模拟触摸屏幕的时长(按下到抬起)，太短会导致部分应用下点击无效，单位毫秒
+ * @param repeatCount 本次点击重复多少次，必须大于0
+ * @param randomPosition 点击位置随机偏移距离，用于反检测
+ * @param randomTime 在随机参数上加减延时时长，有助于防止点击器检测，单位毫秒
+ *
+ * */
 fun click(
     x: Int,
     y: Int,
-    delayTime: Long = 50,
-    duration: Long = 10,
+    delayTime: Long = 0,
+    duration: Long = 200,
     repeatCount: Int = 1,
-    randomPosition: Int = 5,
+    randomPosition: Int = 0,
     randomTime: Long = 0
 ) {
-    FastAccessibilityService.require.dispatchGesture(fastGestureDescription(
-        { it.moveTo(x.toFloat(), y.toFloat()) }
-    ), fastGestureCallback(), null)
-}
-
-
-// 结点点击，现在很多APP屏蔽了结点点击，默认采用手势模拟
-
-
-fun NodeWrapper?.click(gestureClick: Boolean = true, duration: Long = 200L) {
-    if (this == null) return
-    if (gestureClick) {
-        bounds?.let {
-            val x = ((it.left + it.right) / 2).toFloat()
-            val y = ((it.top + it.bottom) / 2).toFloat()
-            FastAccessibilityService.require.dispatchGesture(
-                GestureDescription.Builder().apply {
-                    addStroke(GestureDescription.StrokeDescription(Path().apply { moveTo(x, y) }, 0L, duration))
-                }.build(), object : AccessibilityService.GestureResultCallback() {
-                    override fun onCompleted(gestureDescription: GestureDescription?) {
-                        super.onCompleted(gestureDescription)
-                        // 手势执行完成回调
-                    }
-                }, null
-            )
-        }
-    } else {
-        nodeInfo?.let {
-            var depthCount = 0  // 查找最大深度
-            var tempNode = it
-            while (true) {
-                if (depthCount < 10) {
-                    if (tempNode.isClickable) {
-                        if (duration >= 1000L) {
-                            tempNode.performAction(AccessibilityNodeInfo.ACTION_LONG_CLICK)
-                        } else {
-                            tempNode.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                        }
-                        break
-                    } else {
-                        tempNode = tempNode.parent
-                        depthCount++
-                    }
-                } else break
-            }
-        }
+    repeat(repeatCount) {
+        // 生成(-randomPosition，randomPosition]间的随机数
+        val tempX = x + Random.nextInt(0 - randomPosition, randomPosition + 1)
+        val tempY = y + Random.nextInt(0 - randomPosition, randomPosition + 1)
+        val tempDuration = duration + Random.nextLong(0 - randomTime, randomTime + 1)
+        FastAccessibilityService.require.dispatchGesture(
+            fastGestureDescription({
+                it.moveTo(tempX.toFloat(), tempY.toFloat())
+            }, delayTime, tempDuration), fastGestureCallback(), null
+        )
     }
 }
 
-// 结点长按
+
+/**
+ * 使用手势模拟滑动
+ *
+ * @param startX 滑动起始坐标点的x坐标
+ * @param startY 滑动起始坐标点的y坐标
+ * @param endX 滑动终点坐标点的x坐标
+ * @param endY 滑动终点坐标点的y坐标
+ * @param duration 滑动持续时间，一般在300~500ms效果会好一些，太快会导致滑动不可用
+ * @param repeatCount 滑动重复次数
+ * @param randomPosition 点击位置随机偏移距离，用于反检测
+ * @param randomTime 在随机参数上加减延时时长，有助于防止点击器检测，单位毫秒
+ * */
+fun swipe(
+    startX: Int,
+    startY: Int,
+    endX: Int,
+    endY: Int,
+    duration: Long = 1000L,
+    repeatCount: Int = 1,
+    randomPosition: Int = 0,
+    randomTime: Long = 0
+) {
+    repeat(repeatCount) {
+        // 生成(-randomPosition，randomPosition]间的随机数
+        val tempStartX = startX + Random.nextInt(0 - randomPosition, randomPosition + 1)
+        val tempStartY = startY + Random.nextInt(0 - randomPosition, randomPosition + 1)
+        val tempEndX = endX + Random.nextInt(0 - randomPosition, randomPosition + 1)
+        val tempEndY = endY + Random.nextInt(0 - randomPosition, randomPosition + 1)
+        val tempDuration = duration + Random.nextLong(0 - randomTime, randomTime + 1)
+        FastAccessibilityService.require.dispatchGesture(fastGestureDescription({
+            it.moveTo(tempStartX.toFloat(), tempStartY.toFloat())
+            it.lineTo(tempEndX.toFloat(), tempEndY.toFloat())
+        }, tempDuration), fastGestureCallback(), null)
+    }
+}
+
+/**
+ * 结点操作相关
+ * */
+
+/**
+ * 快速查找到操作结点并执行操作的方法
+ *
+ * @param condition 结点判断表达式
+ * @param action 执行的操作
+ * */
+fun AccessibilityNodeInfo?.fastFindAction(
+    condition: (AccessibilityNodeInfo) -> Boolean,
+    action: (AccessibilityNodeInfo) -> Unit
+) {
+    if (this == null) return
+    var depthCount = 0  // 查找深度
+    var tempNode: AccessibilityNodeInfo? = this // 临时结点
+    while (true) {
+        if (depthCount < 10 && tempNode != null) {
+            if (condition.invoke(tempNode)) {
+                action.invoke(tempNode)
+            } else {
+                tempNode = tempNode.parent
+                depthCount++
+            }
+        } else break
+    }
+}
+
+
+/**
+ * 结点点击，不过现在很多APP都屏蔽了结点点击，所以默认使用手势模拟
+ *
+ * @param gestureClick 是否使用手势模拟点击，默认true
+ * @param duration 点击时长，默认200ms
+ * */
+fun NodeWrapper?.click(gestureClick: Boolean = true, duration: Long = 200L) {
+    if (this == null) return
+    if (gestureClick) {
+        bounds?.let { click((it.left + it.right) / 2, (it.top + it.bottom) / 2, 0, duration) }
+    } else {
+        nodeInfo.fastFindAction({ it.isClickable }, {
+            it.performAction(if (duration >= 1000L) AccessibilityNodeInfo.ACTION_LONG_CLICK else AccessibilityNodeInfo.ACTION_CLICK)
+        })
+    }
+}
+
+/**
+ * 结点长按，不过现在很多APP都屏蔽了结点点击，所以默认使用手势模拟
+ *
+ * @param gestureClick 是否使用手势模拟点击，默认true
+ * @param duration 点击时长，默认时长1000ms
+ * */
 fun NodeWrapper?.longClick(gestureClick: Boolean = true, duration: Long = 1000L) {
     if (this == null) return
     click(gestureClick, duration)
 }
 
-// 向前滑动
-fun NodeWrapper?.scrollForward(isForward: Boolean = true) {
+/**
+ * 向前滑动
+ * */
+fun NodeWrapper?.forward(isForward: Boolean = true) {
     if (this == null) return
-    nodeInfo?.let {
-        var depthCount = 0  // 查找最大深度
-        var tempNode = it
-        while (true) {
-            if (depthCount < 10) {
-                if (tempNode.isScrollable) {
-                    tempNode.performAction(
-                        if (isForward) AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
-                        else AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
-                    )
-                    Log.e("测试", "执行了")
-                    break
-                } else {
-                    tempNode = tempNode.parent
-                    depthCount++
-                }
-            } else break
-        }
-    }
+    nodeInfo.fastFindAction({ it.isScrollable }, {
+        it.performAction(if (isForward) AccessibilityNodeInfo.ACTION_SCROLL_FORWARD else AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD)
+    })
 }
 
-// 向后滑动
-fun NodeWrapper?.backward() = scrollForward(false)
-
-// 从一个坐标点滑动到另一个坐标点
-fun NodeWrapper?.swipe(
-    startX: Int,
-    startY: Int,
-    endX: Int,
-    endY: Int,
-    duration: Long = 1000L
-) {
-    FastAccessibilityService.require.dispatchGesture(
-        GestureDescription.Builder().apply {
-            addStroke(GestureDescription.StrokeDescription(Path().apply {
-                moveTo(startX.toFloat(), startY.toFloat())
-                lineTo(endX.toFloat(), endY.toFloat())
-            }, 0L, duration))
-        }.build(), object : AccessibilityService.GestureResultCallback() {
-            override fun onCompleted(gestureDescription: GestureDescription?) {
-                super.onCompleted(gestureDescription)
-                // 手势执行完成回调
-            }
-        }, null
-    )
-}
-
-// 列表滑动一屏
+/**
+ * 向后滑动
+ * */
+fun NodeWrapper?.backward() = forward(false)
 
 
-// 文本填充
+/**
+ * 文本填充
+ *
+ * @param content 要填充的文本
+ * */
 fun NodeWrapper?.input(content: String) {
     if (this == null) return
-    nodeInfo?.let {
-        var depthCount = 0  // 查找最大深度
-        var tempNode = it
-        while (true) {
-            if (depthCount < 10) {
-                if (tempNode.isEditable) {
-                    tempNode.performAction(
-                        AccessibilityNodeInfo.ACTION_SET_TEXT, Bundle().apply {
-                            putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, content)
-                        }
-                    )
-                    break
-                } else {
-                    tempNode = tempNode.parent
-                    depthCount++
-                }
-            } else break
-        }
-    }
+    nodeInfo.fastFindAction({ it.isEditable }, {
+        it.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, Bundle().apply {
+            putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, content)
+        })
+    })
 }
 
 
@@ -341,12 +372,12 @@ fun AnalyzeSourceResult.findNodesByText(
 /**
  * 根据id查找结点 (模糊匹配)
  *
- * @param id 结点id
+ * @param ids 结点id，可传入多个
  * */
-fun AnalyzeSourceResult.findNodeById(id: String): NodeWrapper? {
+fun AnalyzeSourceResult.findNodeById(vararg ids: String): NodeWrapper? {
     nodes.forEach { node ->
         if (!node.id.isNullOrBlank()) {
-            if (node.id!!.contains(id)) return node
+            ids.forEach { id -> if (node.id!!.contains(id)) return node }
         }
     }
     return null
@@ -355,13 +386,13 @@ fun AnalyzeSourceResult.findNodeById(id: String): NodeWrapper? {
 /**
  * 根据id查找结点列表 (模糊匹配)
  *
- * @param id 结点id
+ * @param ids 结点id, 可传入多个
  * */
-fun AnalyzeSourceResult.findNodesById(id: String): AnalyzeSourceResult {
+fun AnalyzeSourceResult.findNodesById(vararg ids: String): AnalyzeSourceResult {
     val result = AnalyzeSourceResult()
     nodes.forEach { node ->
         if (!node.id.isNullOrBlank()) {
-            if (node.id!!.contains(id)) result.nodes.add(node)
+            ids.forEach { id -> if (node.id!!.contains(id)) result.nodes.add(node) }
         }
     }
     return result
@@ -409,3 +440,4 @@ fun AnalyzeSourceResult.findAllTextNode(includeDesc: Boolean = false): AnalyzeSo
     }
     return result
 }
+

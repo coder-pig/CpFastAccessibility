@@ -1,6 +1,7 @@
 package cn.coderpig.cp_fast_accessibility
 
 import android.accessibilityservice.AccessibilityService
+import android.app.Notification
 import android.content.Context
 import android.graphics.Rect
 import android.view.accessibility.AccessibilityEvent
@@ -23,6 +24,7 @@ abstract class FastAccessibilityService : AccessibilityService() {
         lateinit var specificServiceClass: Class<*> // 具体无障碍服务实现类的类类型
         private var listenEventTypeList = arrayListOf(AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) // 监听的event类型列表
         val currentEvent get() = instance?.currentEventWrapper  // 获取当前Event
+        var enableListenApp: Boolean = true    // 是否监听APP的标记，默认监听
 
         /**
          * 库初始化方法，必须在Application的OnCreate()中调用
@@ -31,7 +33,11 @@ abstract class FastAccessibilityService : AccessibilityService() {
          * @param clazz 无障碍服务的类类型
          * @param typeList 监听的事件类型列表，不传默认只监听TYPE_WINDOW_STATE_CHANGED类型
          * */
-        fun init(context: Context, clazz: Class<*>, typeList: ArrayList<Int>? = null) {
+        fun init(
+            context: Context,
+            clazz: Class<*>,
+            typeList: ArrayList<Int>? = null,
+        ) {
             _appContext = context.applicationContext
             specificServiceClass = clazz
             typeList?.let { listenEventTypeList = it }
@@ -48,22 +54,22 @@ abstract class FastAccessibilityService : AccessibilityService() {
          * 无障碍服务Action套一层，没权限直接跳设置
          * */
         val require get() = run { requireAccessibility(); instance!! }
-
     }
 
-    abstract val enableListenApp: Boolean   // 是否监听APP的标记，不重写默认不监听
     var currentEventWrapper: EventWrapper? = null   // 当前Event
         private set
     var executor: ExecutorService = Executors.newFixedThreadPool(4) // 执行任务的线程池
+
+    var foregroundNotification: Notification? = null    // 前台服务
 
     override fun onServiceConnected() {
         if (this::class.java == specificServiceClass) instance = this
     }
 
     override fun onDestroy() {
-        super.onDestroy()
         if (this::class.java == specificServiceClass) instance = null
         executor.shutdown()
+        super.onDestroy()
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -131,4 +137,5 @@ abstract class FastAccessibilityService : AccessibilityService() {
         e.printStackTrace()
         null
     }
+
 }
