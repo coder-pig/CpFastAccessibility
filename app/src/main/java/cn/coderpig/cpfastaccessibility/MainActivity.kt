@@ -20,7 +20,10 @@ class MainActivity : AppCompatActivity() {
                 if (isAccessibilityEnable) shortToast(getStringRes(R.string.service_is_enable_tips))
                 else requireAccessibility()
             }
-            R.id.bt_open_target_app -> startApp("com.tencent.mm", "com.tencent.mm.ui.LauncherUI", "未安装微信")
+            R.id.bt_open_target_app -> {
+                startApp("com.tencent.mm", "com.tencent.mm.ui.LauncherUI", "未安装微信")
+                FastAccessibilityService.instance?.showFloatWindow()
+            }
         }
     }
 

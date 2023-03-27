@@ -10,13 +10,23 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
+import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.os.Build
 import android.security.KeyChainAliasCallback
+import android.view.LayoutInflater
+import android.view.MotionEvent
+import android.view.View
+import android.view.WindowManager
+import android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.widget.LinearLayout
+import android.widget.RelativeLayout
+import android.widget.TextView
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat.getSystemService
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.random.Random
@@ -132,7 +142,8 @@ abstract class FastAccessibilityService : AccessibilityService() {
     var currentEventWrapper: EventWrapper? = null   // 当前Event
         private set
     var executor: ExecutorService = Executors.newFixedThreadPool(4) // 执行任务的线程池
-
+    var windowService: WindowManager? = null
+    var floatWindow: View? = null
 
     override fun onServiceConnected() {
         if (this::class.java == specificServiceClass) instance = this
@@ -214,6 +225,72 @@ abstract class FastAccessibilityService : AccessibilityService() {
     } catch (e: Throwable) {
         e.printStackTrace()
         null
+    }
+
+    /**
+     * 展示悬浮框的方法，可按需重写
+     * */
+    open fun showFloatWindow() {
+        if (windowService == null) windowService = getSystemService(WINDOW_SERVICE) as? WindowManager
+        if (floatWindow == null) {
+            val lp = WindowManager.LayoutParams().apply {
+                width = 200
+                height = 200
+                type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY // 因为此权限才能展示处理
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                }
+                flags = FLAG_NOT_TOUCH_MODAL
+                format = PixelFormat.TRANSLUCENT
+            }
+            // 通过 LayoutInflater 创建 View
+            val rootView = LayoutInflater.from(this).inflate(R.layout.fly_float_layer, null)
+            rootView.findViewById<TextView>(R.id.tv_test).setOnClickListener {
+                val analyzeSourceResult = AnalyzeSourceResult(arrayListOf())
+                analyzeNode(windows.first { it.title == "微信" }.root, analyzeSourceResult.nodes)
+                analyzeSourceResult.findNodesByExpression {
+                    it.id == "com.tencent.mm:id/hg4" && it.className == "android.widget.TextView"
+                }.nodes.forEach { logD("$currentEventWrapper | $it ") }
+            }
+            rootView.findViewById<RelativeLayout>(R.id.rly_root).apply {
+                var startX = 0.0f
+                var startY = 0.0f
+                setOnTouchListener { _, event ->
+                    when (event.action) {
+                        MotionEvent.ACTION_DOWN -> {
+                            // 获取触摸点在屏幕上的坐标
+                            startX = event.rawX
+                            startY = event.rawY
+                            false
+                        }
+                        MotionEvent.ACTION_MOVE -> {
+                            val dx = event.rawX - startX
+                            val dy = event.rawY - startY
+                            startX = event.rawX
+                            startY = event.rawY
+                            lp.x += dx.toInt()
+                            lp.y += dy.toInt()
+                            windowService?.updateViewLayout(this, lp)
+                            true
+                        }
+                        MotionEvent.ACTION_UP -> {
+                            performClick()
+                            true
+                        }
+                        else -> false
+                    }
+                }
+            }
+            windowService?.addView(rootView, lp)
+        }
+    }
+
+    open fun closeFloatWindow() {
+        if (windowService == null) windowService = getSystemService(WINDOW_SERVICE) as? WindowManager
+        if (floatWindow != null) {
+            windowService!!.removeView(floatWindow)
+            floatWindow = null
+        }
     }
 
 
