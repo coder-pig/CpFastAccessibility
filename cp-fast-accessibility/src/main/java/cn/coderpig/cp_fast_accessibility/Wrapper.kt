@@ -21,6 +21,7 @@ data class EventWrapper(
  * 视图结点包装类
  * */
 data class NodeWrapper(
+    var index: Int? = null,
     var text: String? = null,
     var id: String? = null,
     var bounds: Rect? = null,
@@ -31,7 +32,7 @@ data class NodeWrapper(
     var editable: Boolean = false,
     var nodeInfo: AccessibilityNodeInfo? = null
 ) {
-    override fun toString() = "$className → $text → $id → $description → $bounds → $clickable → $scrollable → $editable"
+    override fun toString() = "$index → $className → $text → $id → $description → $bounds → $clickable → $scrollable → $editable"
 }
 
 

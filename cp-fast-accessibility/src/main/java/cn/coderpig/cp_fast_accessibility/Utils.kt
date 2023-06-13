@@ -34,10 +34,13 @@ fun jumpAccessibilityServiceSettings(
 }
 
 
-fun String?.blankOrThis() = if (this.isNullOrBlank()) "" else this
+fun String?.blankOrThis(blankStr: String = "") = if (this.isNullOrBlank()) blankStr else this
 
-fun CharSequence?.blankOrThis() = if (this.isNullOrBlank()) "" else this.toString()
+fun CharSequence?.blankOrThis(blankStr: String = "") = if (this.isNullOrBlank()) blankStr else this.toString()
 
+fun <I> I?.expressionResult(expression: (I) -> Boolean, correctCallback: (I) -> Unit) {
+    this?.let{ if (expression.invoke(it)) correctCallback.invoke(it) }
+}
 
 @SuppressLint("UseCompatLoadingForDrawables")
 fun Context.getDrawableRes(resId: Int): Drawable =
@@ -49,24 +52,7 @@ fun Context.shortToast(msg: String) =
     Toast.makeText(applicationContext, msg, Toast.LENGTH_SHORT).show()
 
 
-/**
- * 跳转其它APP
- * @param packageName 跳转APP包名
- * @param activityName 跳转APP的Activity名
- * @param errorTips 跳转页面不存在时的提示
- * */
-fun Context.startApp(packageName: String, activityName: String, errorTips: String) {
-    try {
-        startActivity(Intent(Intent.ACTION_VIEW).apply {
-            component = ComponentName(packageName, activityName)
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-        })
-    } catch (e: ActivityNotFoundException) {
-        shortToast(errorTips)
-    } catch (e: Exception) {
-        e.message?.let { logD(it) }
-    }
-}
+
 
 
 const val TAG = "FastAccessibilityService"
