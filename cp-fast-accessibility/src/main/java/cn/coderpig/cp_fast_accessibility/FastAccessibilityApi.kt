@@ -2,20 +2,11 @@ package cn.coderpig.cp_fast_accessibility
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
-import android.content.ActivityNotFoundException
-import android.content.ComponentName
-import android.content.Context
-import android.content.Intent
 import android.graphics.Path
-import android.graphics.Point
-import android.graphics.Rect
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
 import androidx.annotation.RequiresApi
-import org.w3c.dom.Node
-import java.lang.Exception
 import kotlin.random.Random
 
 /**
@@ -25,28 +16,35 @@ import kotlin.random.Random
  */
 
 /**
- * 跳转其它APP
- * @param packageName 跳转APP包名
- * @param activityName 跳转APP的Activity名
- * @param errorTips 跳转页面不存在时的提示
- * */
-fun Context.startApp(packageName: String, activityName: String, errorTips: String) {
-    try {
-        startActivity(Intent(Intent.ACTION_VIEW).apply {
-            component = ComponentName(packageName, activityName)
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-        })
-    } catch (e: ActivityNotFoundException) {
-        shortToast(errorTips)
-    } catch (e: Exception) {
-        e.message?.let { logD(it) }
-    }
-}
-
-/**
  * 无障碍服务是否可用
  * */
 val isAccessibilityEnable get() = FastAccessibilityService.isServiceEnable
+
+/**
+ * 是否监听App
+ * */
+var isListenApp: Boolean
+    get() = FastAccessibilityService.enableListenApp
+    set(value) {
+        FastAccessibilityService.enableListenApp = value
+    }
+
+/**
+ * 显示前台服务
+ * */
+@RequiresApi(Build.VERSION_CODES.O)
+fun showForegroundNotification(
+    title: String = "通知标题",
+    content: String = "通知内容",
+    ticker: String = "通知提示语",
+    iconRes: Int? = null,
+    activityClass: Class<*>? = null
+) = FastAccessibilityService.showForegroundNotification(title, content, ticker, iconRes, activityClass)
+
+/**
+ * 隐藏前台服务
+ * */
+fun closeForegroundNotification() = FastAccessibilityService.closeForegroundNotification()
 
 /**
  * 请求无障碍服务
@@ -56,7 +54,7 @@ fun requireAccessibility() = FastAccessibilityService.requireAccessibility()
 /**
  * 全局操作快速调用
  * */
-fun performAction(action: Int) = FastAccessibilityService.require?.performGlobalAction(action)
+fun performAction(action: Int) = FastAccessibilityService.require.performGlobalAction(action)
 
 // 返回
 fun back() = performAction(AccessibilityService.GLOBAL_ACTION_BACK)
@@ -89,7 +87,8 @@ fun sleep(millis: Long) = Thread.sleep(millis)
 /**
  * 手势模拟相关
  * */
-// 快速生成GestureDescription的方法
+
+// 快速生成GestureDescription
 fun fastGestureDescription(operate: (Path) -> Unit, startTime: Long = 0L, duration: Long = 50L): GestureDescription =
     GestureDescription.Builder().apply {
         addStroke(GestureDescription.StrokeDescription(Path().apply {
@@ -97,7 +96,7 @@ fun fastGestureDescription(operate: (Path) -> Unit, startTime: Long = 0L, durati
         }, startTime, duration))
     }.build()
 
-// 快速生成GestureResultCallback的方法
+// 快速生成GestureResultCallback
 fun fastGestureCallback() = object : AccessibilityService.GestureResultCallback() {
     override fun onCompleted(gestureDescription: GestureDescription?) {
         super.onCompleted(gestureDescription)
@@ -131,7 +130,7 @@ fun click(
         val tempX = x + Random.nextInt(0 - randomPosition, randomPosition + 1)
         val tempY = y + Random.nextInt(0 - randomPosition, randomPosition + 1)
         val tempDuration = duration + Random.nextLong(0 - randomTime, randomTime + 1)
-        FastAccessibilityService.require?.dispatchGesture(
+        FastAccessibilityService.require.dispatchGesture(
             fastGestureDescription({
                 it.moveTo(
                     if (tempX < 0) x.toFloat() else tempX.toFloat(),
@@ -172,7 +171,7 @@ fun swipe(
         val tempEndX = endX + Random.nextInt(0 - randomPosition, randomPosition + 1)
         val tempEndY = endY + Random.nextInt(0 - randomPosition, randomPosition + 1)
         val tempDuration = duration + Random.nextLong(0 - randomTime, randomTime + 1)
-        FastAccessibilityService.require?.dispatchGesture(fastGestureDescription({
+        FastAccessibilityService.require.dispatchGesture(fastGestureDescription({
             it.moveTo(
                 if (tempStartX < 0) startX.toFloat() else tempStartX.toFloat(),
                 if (tempStartY < 0) startY.toFloat() else tempStartY.toFloat()
@@ -466,29 +465,4 @@ fun AnalyzeSourceResult.findAllTextNode(includeDesc: Boolean = false): AnalyzeSo
     }
     return result
 }
-
-
-/**
- * 打印出所有的结点，打印出有用的特征点
- * */
-fun AccessibilityNodeInfo?.printAllNode(level: Int = 0) {
-    if (this == null) return
-    logD(StringBuilder().apply {
-        repeat(level) { append(" ") }
-        val bounds = Rect()
-        this@printAllNode.getBoundsInScreen(bounds)
-        append("${this@printAllNode.className}")
-        this@printAllNode.viewIdResourceName.expressionResult({ it.isNotBlank() }, { append(" → $it") })
-        this@printAllNode.text.expressionResult({ it.isNotBlank() }, { append(" → $it") })
-        this@printAllNode.contentDescription.expressionResult({ it.isNotBlank() }, { append(" → $it") })
-        append(" → $bounds")
-        this@printAllNode.isClickable.expressionResult({ it }, { append(" → 可点击") })
-        this@printAllNode.isScrollable.expressionResult({ it }, { append(" → 可滚动") })
-        this@printAllNode.isEditable.expressionResult({ it }, { append(" → 可编辑") })
-    }.toString())
-    if (this.childCount > 0) {
-        for (index in 0 until this.childCount) this.getChild(index).printAllNode(level + 1)
-    }
-}
-
 

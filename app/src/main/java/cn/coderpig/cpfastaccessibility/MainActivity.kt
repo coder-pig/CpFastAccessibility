@@ -20,9 +20,9 @@ class MainActivity : AppCompatActivity() {
                 if (isAccessibilityEnable) shortToast(getStringRes(R.string.service_is_enable_tips))
                 else requireAccessibility()
             }
-
             R.id.bt_open_target_app -> {
-                startApp("com.jingdong.app.mall", "com.jingdong.app.mall.main.MainActivity", "未安装呢")
+//                startApp("com.tencent.mm", "com.tencent.mm.ui.LauncherUI", "未安装微信")
+                FastAccessibilityService.instance?.showFloatWindow()
             }
         }
     }
@@ -48,10 +48,10 @@ class MainActivity : AppCompatActivity() {
             mServiceStatusIv.setImageDrawable(getDrawableRes(R.drawable.ic_service_enable))
             mServiceStatusTv.text = getStringRes(R.string.service_status_enable)
             mOpenTargetAppBt.visibility = View.VISIBLE
-//            FastAccessibilityService.showForegroundNotification(
-//                "守护最好的坤坤🐤", "用来保护的，不用理我", "提示信息",
-//                activityClass = MainActivity::class.java
-//            )
+            FastAccessibilityService.showForegroundNotification(
+                "守护最好的坤坤🐤", "用来保护的，不用理我", "提示信息",
+                activityClass = MainActivity::class.java
+            )
         } else {
             mServiceStatusIv.setImageDrawable(getDrawableRes(R.drawable.ic_service_disable))
             mServiceStatusTv.text = getStringRes(R.string.service_status_disable)
